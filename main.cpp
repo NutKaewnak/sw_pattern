@@ -1,42 +1,46 @@
 #include <iostream>
-#include "creader.h"
+#include <fstream>
+#include "include/reader.h"
 
 using namespace std;
 
 int main(int argc, char *argv[]){
-    CReader cReader = CReader::CReader();
-//    if(argc < 2){
-//        printf("usage: %s filename.dat\n", argv[0]);
-//        return 0;
-//    }
-    FILE* fp = fopen("~/ClionProject/sw_pattern/SyllableDB-V1.dat", "rb");
-    cReader.syllable_skip_to_data(fp);
+    std::string file_directory = "/Users/Nicole/ClionProjects/sw_pattern/SyllableDB-V1.dat";
 
-    CReader::DATA_RECORD* record = (CReader::DATA_RECORD*) malloc(sizeof(CReader::DATA_RECORD));
-    iconv_t charset = iconv_open("UTF8", "CP874");
-    int lastId = 0;
-    int timeSize = TIME_DETECT;
-    while(!feof(fp)){
-        if(cReader.syllable_read_record(fp, charset, record, timeSize) != 1){
-            break;
+    bool is_64;
+    is_64 = Reader::is_64(file_directory);
+    ifstream fp(file_directory, ios::binary);
+    Reader::FILEID id;
+    // read header
+    fp.read((char*) &id, sizeof(id));
+
+    while(true){
+        if (is_64) {
+            Reader::SYLLABLE_DATA_RECORD record;
+            // read record header
+            fp.read((char*) &record, sizeof(record) - MAX_SYLLABLE_TEXTSIZE - 1);
+            if(!fp){
+                break;
+            }
+
+            // read record text
+            fp.getline((char*) &record.szText, MAX_SYLLABLE_TEXTSIZE, 0);
+            cout << record.ui32SylID << " " << record.szText << endl;
         }
+        else{
+            Reader::SYLLABLE_DATA_RECORD_32 record;
+            // read record header
+            fp.read((char*) &record, sizeof(record) - MAX_SYLLABLE_TEXTSIZE - 1);
+            if(!fp){
+                break;
+            }
 
-        if(record->header.id != lastId + 1){
-            printf("E: Record not continuous. Expecting ID %d, found %d\n", lastId+1, record->header.id);
-            return 1;
+            // read record text
+            fp.getline((char*) &record.szText, MAX_SYLLABLE_TEXTSIZE, 0);
+            cout << record.ui16SylID << " " << record.szText << endl;
         }
-
-        lastId = record->header.id;
-        timeSize = record->timeSize;
-
-        printf(
-                "record %d lang %d length %d tailSpace %d unused %d numeric %d mapfilepos %d timestamp %lld\n",
-                record->header.id, record->header.lang, record->header.length, record->header.tailSpace,
-                record->header.isUnused, record->header.numeric, record->header.mapFilePos,
-                record->timestamp
-        );
-        printf("%s\n=========\n", record->szText);
     }
 
     return 0;
+
 }
